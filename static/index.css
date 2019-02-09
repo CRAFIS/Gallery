@@ -1,0 +1,92 @@
+body {
+    font-family: 'Avenir','Helvetica Neue','Helvetica','Arial','Hiragino Sans','ヒラギノ角ゴシック',YuGothic,'Yu Gothic','メイリオ', Meiryo,'ＭＳ Ｐゴシック','MS PGothic';
+}
+
+input, textarea, select, button {
+    font-family: inherit;
+}
+
+a {
+    text-decoration: none;
+}
+
+.square_btn {
+    display: inline-block;
+    padding: 0.5em 1em;
+    text-decoration: none;
+    background: #668ad8; /*ボタン色*/
+    color: #FFF;
+    border-bottom: solid 4px #627295;
+    border-radius: 3px;
+    cursor: pointer;
+    cursor: hand;
+}
+
+.square_btn:active { /*ボタンを押したとき*/
+    -ms-transform: translateY(4px);
+    -webkit-transform: translateY(4px);
+    transform: translateY(4px); /*下に動く*/
+    box-shadow: 0px 0px 1px rgba(0, 0, 0, 0.2); /*影を小さく*/
+    border-bottom: none;
+}
+
+.box {
+    font-weight: bold;
+    color: #6091d3; /*文字色*/
+    background: #FFF;
+    border: solid 5px #6091d3; /*線*/
+    border-radius: 10px; /*角の丸み*/
+}
+
+.oneline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #fff;
+    border-left: solid 1px #ececec;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 2px #fff;
+}
+
+div#panorama_wrapper {
+    overflow: hidden;
+    position: relative;
+}
+
+div#panorama_image {
+    position: absolute;
+}
+
+.button {
+    display: inline-block;
+    padding: 0.3em 1em;
+    text-decoration: none;
+    color: #67c5ff;
+    border: solid 2px #67c5ff;
+    border-radius: 3px;
+    transition: .4s;
+    background-color: #FFFFFF;
+}
+
+.button:hover {
+    background: #67c5ff;
+    color: white;
+}
+
+.menu {
+    position: fixed;
+    width: 30%;
+    height: 70vh;
+    overflow-y: scroll;
+}

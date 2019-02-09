@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Image Documentary Gallery</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+</head>
+<body>
+
+<div style="position: fixed; right: 10px;">
+    {% if "username" in session %}
+    <a href="/logout" class="button" style="font-size: large;">Logout</a>
+    {% else %}
+    <a href="/login" class="button" style="font-size: large;">Login</a>
+    {% endif %}
+</div>
+
+<div style="position: fixed; right: 110px;">
+    <a href="/sign_up" class="button" style="font-size: large;">Add Curator</a>
+</div>
+
+<div style="position: fixed; left: 10px;">
+    <a href="/" class="button" style="font-size: large;">Home</a>
+</div>
+
+<div style="width: 40%; margin-left: auto; margin-right: auto; top: 50px; position: relative;">
+    <img id="image" class="box" style="position: relative; width: 100%;" src="{{ url_for('static', filename='data/default.png') }}">
+    <form action="execute_add_scene" method="post" enctype="multipart/form-data">
+        <p><input type="radio" name="type" value="static" style="margin: 10px 0;" checked>Static
+        <input type="radio" name="type" value="panorama">Panorama
+        <p><input type="file" id="img_file" name="img_file">
+        <p><input type="text" name="title" placeholder="Title" style="width:100%; height:30px; font-size:large; margin: 10px 0;">
+        <p><button name="id" value="{{ scene['id'] }}" class="button" style="width:100%; height:50px; font-size: large; margin-bottom: 10px;">submit</button>
+    </form>
+</div>
+
+<script>
+    $('input[type=file]').change(function() {
+        var file = $(this).prop('files')[0];
+        var reader = new FileReader();
+        reader.onload = function() {
+            $('#image').attr('src', reader.result);
+        }
+        reader.readAsDataURL(file);
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Image Documentary Gallery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+</head>
+<body>
+
+    <div style="position: fixed; right: 10px;">
+    {% if "username" in session %}
+    <a href="/logout" class="button" style="font-size: large;">Logout</a>
+    {% else %}
+    <a href="/login" class="button" style="font-size: large;">Login</a>
+    {% endif %}
+    </div>
+
+    <div style="position: fixed; right: 110px;">
+        {% if "username" not in session %}
+        <a href="/sign_up" class="button" style="font-size: large;">Sign up</a>
+        {% endif %}
+    </div>
+
+    <div style="position: fixed; left: 10px;">
+        <a href="/" class="button" style="font-size: large;">Home</a>
+    </div>
+
+    <center>
+        {% if "username" in session %}
+        <h1>Hello {{ session["username"] }}!</h1>
+        {% else %}
+        <h1>Hello Guest!</h1>
+        {% endif %}
+    </center>
+
+        <div style="float:right; width:40%; top: 50px; right: 15%; position: relative">
+            <img id = "image" class="box" style="position: relative; width:100%;" src="{{ url_for('static', filename='data/default.png') }}">
+        </div>
+
+        <div class="menu box" style="position: absolute; left: 5%; top: 100px;">
+            {% for scene in story %}
+            <a href="/scene?id={{ scene['id'] }}">
+                <button class="button" id="{{ scene['id'] }}" style="position: relative; margin: 10px 10px; width:93%; height:50px; font-size: large; cursor: pointer;">
+                {{ scene["name"] }}
+                </button>
+            </a>
+            <script>
+                var divElement = document.getElementById( "{{ scene['id'] }}" );
+                var imageElement = document.getElementById( "image" );
+    
+                divElement.onmouseover = mouseOver;
+                divElement.onmouseout = mouseOut;
+                divElement.addEventListener("touchstart", mouseOver, false);
+                divElement.addEventListener("touchend", mouseOut, false);
+                function mouseOver() {
+                    document.getElementById("image").src = "{{ url_for('static', filename=scene['path']) }}";
+                }
+                function mouseOut() {
+                    document.getElementById("image").src = "{{ url_for('static', filename='data/default.png') }}";
+                }
+            </script>
+            {% endfor %}
+        </div>
+
+</body>
+</html>

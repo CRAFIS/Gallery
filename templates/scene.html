@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Digital Image Documentary Gallery</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <script>
+        var child = {{ child | tojson }};
+        var r = 60, id = 0;
+        $(window).on("load", function() {
+            $("#canvas").attr("height", $("#wrapper").height());
+            var cvs = document.getElementById("canvas");
+            var ctx = cvs.getContext("2d");
+            var img = new Image();
+            var width = $("#canvas").width();
+            var height = $("#canvas").height();
+            var screenX, screenY;
+            img.src = "{{ url_for('static', filename=scene['path']) }}";
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, width, height);
+                child.forEach(function(scene) {
+                    draw(width * scene["x_ratio"], height * scene["y_ratio"]);
+                });
+            }
+            $("#canvas").on("mousemove", function(e) {
+                var x = e.offsetX;
+                var y = e.offsetY;
+                child.some(function(scene) {
+                    var a = width * scene["x_ratio"];
+                    var b = height * scene["y_ratio"];
+                    var point = (x-a)**2 + (y-b)**2;
+                    if(point < r**2){
+                        id = scene["id"];
+                        document.body.style.cursor = "pointer";
+                        return true;
+                    }
+                    else{
+                        document.body.style.cursor = "auto";
+                    }
+                });
+            });
+            $("#canvas").on("click", function(e) {
+                if(document.body.style.cursor == "pointer"){
+                    window.location.href = "/scene?id=" + id;
+                }
+                {% if session["type"] == "curator" %}
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                child.forEach(function(scene) {
+                    draw(width * scene["x_ratio"], height * scene["y_ratio"]);
+                });
+                draw(e.offsetX, e.offsetY, "red");
+                ctx.textAlign = "center";
+                ctx.font = "32px serif";
+                ctx.fillStyle = "red";
+                ctx.strokeText("Child", e.offsetX, e.offsetY + 12);
+                $("*[name=x_ratio]").val(e.offsetX / width);
+                $("*[name=y_ratio]").val(e.offsetY / height);
+                {% endif %}
+            });
+            $("#canvas").draggable({
+                axis: "x",
+                start: function(e) {
+                    screenX = e.screenX;
+                },
+                drag: function(e, ui) {
+                    ui.position.left = 0;
+                    var left = $("#wrapper").scrollLeft();
+                    var dist = Math.abs(screenX - e.screenX);
+                    if(screenX > e.screenX) {
+                        $("#wrapper").scrollLeft(left + dist);
+                    }
+                    else {
+                        $("#wrapper").scrollLeft(left - dist);
+                    }
+                    screenX = e.screenX;
+                }
+            });
+        });
+        function draw(x, y, color = "black") {
+            var canvas = document.getElementById("canvas");
+            if(!canvas || !canvas.getContext) return false;
+            var ctx = canvas.getContext("2d");
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI*2, false);
+            ctx.stroke();
+        }
+    </script>
+</head>
+
+<body>
+
+<div style="position: fixed; right: 10px;">
+    {% if "username" in session %}
+    <a href="/logout" class="button" style="font-size: large;">Logout</a>
+    {% else %}
+    <a href="/login" class="button" style="font-size: large;">Login</a>
+    {% endif %}
+</div>
+
+<div style="position: fixed; left: 10px;">
+    <a href="/" class="button" style="font-size: large;">Home</a>
+</div>
+
+<h1 style="text-align: center;">{{ scene["name"] }}</h1>
+
+{% if scene["type"] == "panorama" %}
+<div id="wrapper" class="box" style="overflow-x: scroll; overflow-y: hidden; width: 80%; height: 80vh; margin-left: auto; margin-right: auto;">
+    <canvas id="canvas" width="4000"></canvas>
+</div>
+{% elif scene["type"] == "static" %}
+<div style="text-align: center;">
+{% if child != [] %}
+<a href="/scene?id={{ child[0]['id'] }}">
+{% endif %}
+<img class="box" src="{{ url_for('static', filename=scene['path']) }}" style="height: 80vh;">
+</div>
+{% endif %}
+
+{% if scene["parent_id"] == None %}
+<a href="/" class="button" style="position: fixed; bottom: 10px; left: 10px; font-size: large;">Back</a>
+{% else %}
+<a href="/scene?id={{ scene['parent_id'] }}" class="button" style="position: fixed; bottom: 10px; left: 10px; font-size: large;">Back</a>
+{% endif %}
+
+<div style="position: fixed; right: 110px; top: 21px;">
+    {% if "username" not in session %}
+        <a href="/sign_up" class="button" style="font-size: large;">Sign up</a>
+    {% endif %}
+</div>
+
+{% if session["type"] == "curator" and (child == [] or scene["type"] == "panorama") %}
+<form action="/add_scene" method="POST">
+    <button name="id" value="{{ scene['id'] }}" class="button" style="position: fixed; bottom: 50px; right: 10px; font-size: large; width: 100px; text-align: center;">Add</button>
+    <input name="x_ratio" value="" style="display: none;"></input>
+    <input name="y_ratio" value="" style="display: none;"></input>
+</form>
+{% endif %}
+
+{% if session["type"] == "curator" and child == [] %}
+<form action="/delete_scene" method="POST" onSubmit="return check()">
+    <button name="id" value="{{ scene['id'] }}" class="button" style="position: fixed; bottom: 10px; right: 10px; font-size: large; width: 100px; text-align: center;">Delete</button>
+</form>
+{% endif %}
+
+{% if session["type"] == "visitor" %}
+<form method="POST" action="/add_feedback">
+    <div align="center" style="margin-top:100px;">
+        <textarea name="message" cols=100 rows=10></textarea>
+    </div>
+    <div align="center" style="margin-top:10px;">
+        <button name="id" value="{{ scene['id'] }}" type="submit" class="button" style="width:55%; height: 50px; font-size: large;">Submit</button>
+    </div>
+</form>
+{% endif %}
+
+    <div class="menu box" style="margin: 50px 0; position:relative; margin-right:auto; margin-left:auto;">
+        {% for Data in allFeedback %}
+            <div class="box" style="margin:10px;">
+            <p style="margin-left: 10px;">{{Data['message']}}</p>
+            <p style="text-align: right; margin-right: 10px;">{{Data['date']}}</p>
+            {% if session["type"] == "curator" %}
+            <form action="/delete_feedback" method="POST" onSubmit="return check()">
+                <button name="feedback_id" value="{{ Data['id'] }}" class="button" style="margin: 10px;">Delete</button>
+            </form>
+            {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+<script>
+function check() {
+    if(window.confirm("Are you sure you want to delete this one?")) {
+        return true;
+    } else {
+        return false;
+    }
+}
+</script>
+
+</body>
+</html>
