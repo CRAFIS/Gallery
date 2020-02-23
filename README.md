@@ -1,4 +1,4 @@
-# Gallery
+# Digital Image Documentary Gallery
 
 ## Installation
 
