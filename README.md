@@ -1,13 +1,8 @@
 # Digital Image Documentary Gallery
 
-## Installation
+## Development
 
-  ```
-  $ pip3 install flask
-  ```
+```
+$ python3 run.py
+```
 
-## Usage
-
-  ```
-  $ python3 run.py
-  ```
