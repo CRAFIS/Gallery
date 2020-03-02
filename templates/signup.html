@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Image Documentary Gallery</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+
+<body>
+
+    <nav class="navbar navbar-light bg-light">
+        <a class="navbar-brand" href="/">Home</a>
+        <div>
+            <a class="btn btn-outline-primary" href="/signup">Sign up</a>
+            <a class="btn btn-outline-primary" href="/signin">Sign in</a>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row justify-content-around">
+            <div class="card col-5 p-0">
+                <div class="card-body">
+                    <form action="/signup/submit" method="POST">
+                        <div class="form-group">
+                            <label>ユーザー名</label>
+                            <input type="text" class="form-control" name="username" value="{{ username }}">
+                            {% if username_error_message %}
+                            <p class="text-danger">{{ username_error_message }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label>パスワード</label>
+                            <input type="password" class="form-control" name="password">
+                            {% if password_error_message %}
+                            <p class="text-danger">{{ password_error_message }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="text-right">
+                            <button type="submit" class="btn btn-primary">新規登録</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

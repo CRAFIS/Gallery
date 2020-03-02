@@ -1,131 +1,198 @@
-# -*- coding: utf-8 -*-
-
-from flask import Flask, render_template, redirect
-from flask import request, url_for, jsonify, session
-import os, re, db, datetime, random, auth
+from flask import Flask, render_template, redirect, request, url_for, session
+from flask_sqlalchemy import SQLAlchemy
+import os, json, hashlib
 
 app = Flask(__name__)
 
-app.secret_key = "FY2TCPEUY8UZWYHLWXNR"
+app.secret_key = '1234567890'
 
-@app.route("/")
+db_url = os.environ.get('DATABASE_URL') or 'postgresql://localhost/gallery'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# ユーザーテーブル
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String(), nullable = False, unique = True)
+    hash = db.Column(db.String(), nullable = False)
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name
+        }
+
+# ストーリーテーブル
+class Story(db.Model):
+    __tablename__ = 'stories'
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String())
+    path = db.Column(db.String())
+    user_id = db.Column(db.Integer)
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'path': self.path,
+            'user_id': self.user_id
+        }
+
+# シーンテーブル
+class Scene(db.Model):
+    __tablename__ = 'scenes'
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String())
+    path = db.Column(db.String())
+    story_id = db.Column(db.Integer)
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'path': self.path,
+            'story_id': self.story_id
+        }
+
+# マイユーザー取得
+def get_self_user():
+    user_id = session.get('user_id')
+    return db.session.query(User).filter(User.id == user_id).first()
+
+# ユーザーネームからユーザー取得
+def get_user(username):
+    return db.session.query(User).filter(User.name == username).first()
+
+# IDからストーリー取得
+def get_story(story_id):
+    return db.session.query(Story).filter(Story.id == story_id).first()
+
+# パスワードをハッシュ化して取得
+def get_hash(password):
+    text = password.encode('utf-8')
+    return hashlib.sha512(text).hexdigest()
+
+# トップページ
+@app.route('/')
 def index():
-    db.create()
-    if db.getAllUser() == []:
-        session["username"] = "Anonymous"
-        session["type"] = "curator"
-    story = db.getAllStory()
-    story = [scene for scene in story if scene["parent_id"] == None]
-    story = sorted(story, key = lambda scene: scene["id"])
-    if session.get("type") == "curator":
-        session["x_ratio"], session["y_ratio"] = None, None
-        return render_template("curator.html", session = session, story = story)
-    return render_template("index.html", session = session, story = story)
+    user = get_self_user()
+    message = session.pop('message', None)
+    return render_template('index.html', user = user, message = message)
 
-@app.route("/login", methods = ["GET", "POST"])
-def login():
-    if request.method == "POST":
-        user = db.getUser(request.form["username"])
-        if auth.auth(user, request.form["password"]):
-            if not session:
-                session["username"] = user["name"]
-                session["type"] = user["type"]
-            return redirect(url_for("index"))
-    return render_template("login.html")
+# ログインページ
+@app.route('/signin')
+def signin_page():
+    user = get_self_user()
+    if user: return redirect(url_for('index'))
+    return render_template('signin.html')
 
-@app.route("/logout")
-def logout():
+# ログイン処理
+@app.route('/signin/submit', methods = ['POST'])
+def signin():
+    user = get_self_user()
+    if user: return redirect(url_for('index'))
+    user = get_user(request.form['username'])
+    if user is None: return render_template('signin.html', error = True)
+    password = request.form['password']
+    if not password.isalnum(): return render_template('signin.html', error = True)
+    hash = get_hash(password)
+    if hash != user.hash: return render_template('signin.html', error = True)
+    session['user_id'] = user.id
+    return redirect(url_for('index'))
+
+# 新規登録ページ
+@app.route('/signup')
+def signup_page():
+    user = get_self_user()
+    if user: return redirect(url_for('index'))
+    return render_template('signup.html')
+
+# 新規登録処理
+@app.route('/signup/submit', methods = ['POST'])
+def signup():
+    user = get_self_user()
+    if user: return redirect(url_for('index'))
+    username = request.form['username']
+    if username == '':
+        message = "ユーザー名を入力してください"
+        return render_template('signup.html', username_error_message = message)
+    user = get_user(username)
+    if user:
+        message = "このユーザー名は既に使用されています"
+        return render_template('signup.html', username_error_message = message, username = username)
+    password = request.form['password']
+    if not password.isalnum() or len(password) < 8:
+        message = "パスワードは8文字以上の英数字で設定してください"
+        return render_template('signup.html', password_error_message = message, username = username)
+    user = User()
+    user.name = username
+    user.hash = get_hash(password)
+    db.session.add(user)
+    db.session.commit()
+    session['user_id'] = user.id
+    session['message'] = "ようこそ！さっそくストーリーを投稿してみましょう！"
+    return redirect(url_for('index'))
+
+# ログアウト
+@app.route('/signout')
+def signout():
     session.clear()
-    return redirect(url_for("index"))
+    return redirect(url_for('index'))
 
-@app.route("/sign_up", methods = ["GET", "POST"])
-def sign_up():
-    if session.get("type") == "visitor":
-        return redirect(url_for("index"))
-    if request.method == "POST":
-        username = request.form["username"]
-        user = db.getUser(username)
-        if not user:
-            salt = ''.join([random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(20)])
-            password = auth.getHash(request.form["password"] + salt)
-            if session.get("type") == "curator":
-                db.addUser(username, "curator", password, salt)
-            else:
-                db.addUser(username, "visitor", password, salt)
-                session["username"] = username
-                session["type"] = "visitor"
-            return redirect(url_for("index"))
-    return render_template("sign_up.html")
+# ストーリー作成ページ
+@app.route('/story/create')
+def create_story_page():
+    user = get_self_user()
+    if user is None: return redirect(url_for('index'))
+    return render_template('create_story.html', user = user)
 
-@app.route("/scene", methods = ["GET"])
-def scene():
-    if request.method == "GET":
-        scene_id = request.args.get("id", type = int)
-        story = db.getAllStory()
-        scene = [scene for scene in story if scene_id == scene["id"]]
-        allFeedback = reversed(db.selectFeedback(scene_id))
-        if scene != []:
-            child = [scene for scene in story if scene_id == scene["parent_id"]]
-            return render_template("scene.html", session = session, scene = scene[0], child = child, allFeedback = allFeedback)
-    return redirect(url_for("index"))
+# ストーリー作成処理
+@app.route('/story/submit', methods = ['POST'])
+def create_story():
+    user = get_self_user()
+    if user is None: return redirect(url_for('index'))
+    story_name = request.form['story_name']
+    story_image = request.files['story_image']
+    if not (story_name and story_image):
+        return render_template('create_story.html', user = user, error = True)
+    story = Story()
+    story.name = story_name
+    story.user_id = user.id
+    db.session.add(story)
+    db.session.commit()
+    story_path = f"images/stories/{story.id}.jpg"
+    story_image.save(f"./static/{story_path}")
+    story.path = story_path
+    db.session.commit()
+    session['message'] = "ストーリーを投稿しました！"
+    return redirect(url_for('index'))
 
-@app.route("/add_scene", methods = ["GET", "POST"])
-def add_scene():
-    if session.get("type") == "curator" and request.method == "POST":
-        scene_id = int(request.form["id"])
-        scene = db.get_scene(scene_id)
-        if not scene: scene = {"id": 0, "type": None}
-        session["x_ratio"] = request.form.get("x_ratio", session["x_ratio"])
-        session["y_ratio"] = request.form.get("y_ratio", session["y_ratio"])
-        return render_template("add_scene.html", session = session, scene = scene)
-    return redirect(url_for("index"))
+# ストーリー削除処理
+@app.route('/story/<story_id>/delete')
+def delete_story(story_id = None):
+    user = get_self_user()
+    if user is None: return redirect(url_for('index'))
+    story = get_story(story_id)
+    if story is None: return redirect(url_for('index'))
+    if user.id != story.user_id: return redirect(url_for('index'))
+    os.remove(f"./static/{story.path}")
+    db.session.delete(story)
+    db.session.commit()
+    session['message'] = "ストーリーを削除しました！"
+    return redirect(url_for('index'))
 
-@app.route("/execute_add_scene", methods = ["GET", "POST"])
-def execute_add_scene():
-    if session.get("type") == "curator" and request.method == "POST":
-        img_file = request.files["img_file"]
-        parent_id = int(request.form["id"])
-        title = request.form["title"]
-        scene_type = request.form["type"]
-        if parent_id == 0: parent_id = None
-        scene = db.add_scene(title, "", scene_type, parent_id)
-        path = "data/{}.jpg".format(scene['id'])
-        img_file.save("./static/" + path)
-        db.update_scene(scene["id"], "path", path)
-        if session.get("x_ratio") and session.get("y_ratio"):
-            db.add_to_panorama(parent_id, None, float(session["x_ratio"]), float(session["y_ratio"]))
-    return redirect(url_for("index"))
+# ストーリー取得API
+@app.route('/api/stories')
+def get_stories_api():
+    stories = db.session.query(Story).order_by(Story.id.desc()).limit(100).all()
+    stories = [story.to_dict() for story in stories]
+    return json.dumps(stories)
 
-@app.route("/delete_scene", methods = ["GET", "POST"])
-def delete_scene():
-    if session.get("type") == "curator" and request.method == "POST":
-        db.delete_scene(request.form["id"])
-    return redirect(url_for("index"))
-
-@app.route("/add_feedback", methods = ["GET", "POST"])
-def add_feedback():
-    if session.get("type") == "visitor" and request.method == "POST":
-        user = db.getUserID(session.get("username"))
-        user_id = int(user['id'])
-        message = request.form["message"]
-        date = datetime.datetime.today().strftime("%Y/%m/%d %H:%M:%S")
-        scene_id = int(request.form["id"])
-        db.addFeedback(int(user_id), str(message), str(date), int(scene_id))
-    return redirect(url_for("index"))
-
-@app.route("/delete_feedback", methods = ["GET", "POST"])
-def delete_feedback():
-    if session.get("type") == "curator" and request.method == "POST":
-        db.deleteFeedback(request.form["feedback_id"])
-    return redirect(url_for("index"))
-
-@app.route("/upload", methods = ["GET", "POST"])
-def upload():
-    if session.get("type") == "curator":
-        return render_template("upload.html")
-    return redirect(url_for("index"))
+# マイユーザー取得API
+@app.route('/api/user')
+def get_self_user_api():
+    user = get_self_user()
+    user = user.to_dict() if user else {}
+    return json.dumps(user)
 
 if __name__ == "__main__":
-    port = 8888
-    app.debug = True
-    app.run(host = "localhost", port = port)
+    app.run(host = '0.0.0.0', port = 8080, debug = True)
