@@ -17,7 +17,7 @@
             <div class="list-group border rounded" style="height: 500px; overflow-y: scroll;">
                 <button v-for="story in stories" @click="target = story" v-bind:class="{active: story.id == target.id}" class="list-group-item list-group-item-action">[[ story.name ]]</button>
             </div>
-            <a v-if="user.id" class="btn btn-outline-primary w-100 mt-2" href="/story/create">ストーリー投稿</a>
+            <a v-if="user.id" class="btn btn-outline-primary w-100 mt-2" href="/story/create">ストーリーを投稿する</a>
         </div>
 
         <div class="col-7 text-center">
