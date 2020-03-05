@@ -15,14 +15,14 @@
 
         <div class="col-5">
             <div class="list-group border rounded" style="height: 500px; overflow-y: scroll;">
-                <button v-for="story in stories" @click="target = story" v-bind:class="{active: story.id == target.id}" class="list-group-item list-group-item-action">[[ story.name ]]</button>
+                <button v-for="story in stories" @click="handleClick(story)" v-bind:class="{active: story.id == target.id}" class="list-group-item list-group-item-action">[[ story.name ]]</button>
             </div>
             <a v-if="user.id" class="btn btn-outline-primary w-100 mt-2" href="/story/create">ストーリーを投稿する</a>
         </div>
 
         <div class="col-7 text-center">
             <a v-if="target.id" v-bind:href="`/story/${target.id}`">
-                <img class="border rounded mw-100" v-bind:src="`/static/${target.path}`" style="max-height: 400px;">
+                <img id="image" class="border rounded mw-100" style="max-height: 400px;">
             </a>
             <img v-else class="w-100" src="/static/images/welcome.jpg">
             <div v-if="user.id && target.user_id == user.id" class="row mt-3 mx-3 justify-content-around">
@@ -50,6 +50,19 @@
             stories: []
         },
         methods: {
+            handleClick: function(story) {
+                this.target = story;
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `/api/story/${story.id}/image`, true);
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = function() {
+                    const blob = new Blob([this.response], {type: 'image/*'});
+                    const url = window.URL || window.webkitURL;
+                    const img = document.getElementById('image');
+                    img.src = url.createObjectURL(blob);
+                }
+                xhr.send();
+            }
         },
         mounted: function() {
             $.ajax({

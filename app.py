@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request, url_for, session
+from flask import Flask, render_template, redirect, request, url_for, make_response, session
 from flask_sqlalchemy import SQLAlchemy
 import os, json, hashlib
 
@@ -28,13 +28,12 @@ class Story(db.Model):
     __tablename__ = 'stories'
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String())
-    path = db.Column(db.String())
     user_id = db.Column(db.Integer)
+    image = db.Column(db.LargeBinary)
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
-            'path': self.path,
             'user_id': self.user_id
         }
 
@@ -43,13 +42,12 @@ class Scene(db.Model):
     __tablename__ = 'scenes'
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String())
-    path = db.Column(db.String())
     story_id = db.Column(db.Integer)
+    image = db.Column(db.LargeBinary)
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
-            'path': self.path,
             'story_id': self.story_id
         }
 
@@ -157,11 +155,8 @@ def create_story():
     story = Story()
     story.name = story_name
     story.user_id = user.id
+    story.image = story_image.read()
     db.session.add(story)
-    db.session.commit()
-    story_path = f"images/stories/{story.id}.jpg"
-    story_image.save(f"./static/{story_path}")
-    story.path = story_path
     db.session.commit()
     session['message'] = "ストーリーを投稿しました！"
     return redirect(url_for('index'))
@@ -174,7 +169,6 @@ def delete_story(story_id = None):
     story = get_story(story_id)
     if story is None: return redirect(url_for('index'))
     if user.id != story.user_id: return redirect(url_for('index'))
-    os.remove(f"./static/{story.path}")
     db.session.delete(story)
     db.session.commit()
     session['message'] = "ストーリーを削除しました！"
@@ -186,6 +180,16 @@ def get_stories_api():
     stories = db.session.query(Story).order_by(Story.id.desc()).limit(100).all()
     stories = [story.to_dict() for story in stories]
     return json.dumps(stories)
+
+# ストーリー画像取得API
+@app.route('/api/story/<story_id>/image')
+def get_story_image_api(story_id = None):
+    story = get_story(story_id)
+    response = make_response()
+    response.data = story.image
+    response.headers['Content-Disposition'] = f"attachment; filename={story.id}.png"
+    response.mimetype = 'image/*'
+    return response
 
 # マイユーザー取得API
 @app.route('/api/user')
