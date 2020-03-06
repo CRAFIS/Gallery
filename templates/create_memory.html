@@ -1,0 +1,64 @@
+{% extends 'layout.html' %}
+{% block content %}
+
+<div class="container my-5">
+    <div class="row justify-content-around">
+        <div class="card col-8 p-0">
+            <h5 class="card-header">思い出</h5>
+            <div class="card-body">
+                <form action="/memory/submit" method="POST" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>写真</label>
+                        <input type="file" name="image" class="w-100 p-2" accept="image/*" style="height: 300px; border: dashed rgba(0, 0, 0, 0.15);">
+                        <div id="image_box" style="height: 0;">
+                            <img id="image" class="w-25 mt-2" src="">
+                        </div>
+                    </div>
+                    <div id="tag-form" class="form-group">
+                        <div><label>タグ</label></div>
+                        <input v-for="id in length" type="text" class="form-control w-50 mb-3 mr-2" name="tags" placeholder="10文字以内で入力してください" style="display: inline;">
+                        <span v-if="length < 10" @click="handleClick" class="btn btn-outline-info" style="cursor: pointer;">追加</span>
+                    </div>
+                    {% if error %}
+                    <p class="text-danger">写真を設定してください</p>
+                    {% endif %}
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary w-25">投稿する</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('input[name=image]').change(function() {
+        const file = $(this).prop('files')[0];
+        if (file.size > 5000000) {
+            $(this).val('');
+            $('#image').attr('src', '');
+            $('#image').css('border', '');
+            alert("ファイルサイズは5MB以下にしてください");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => $('#image').attr('src', reader.result);
+        reader.readAsDataURL(file);
+        $('#image').css('border', '2mm ridge #CCCCCC');
+        $('#image_box').css('height', '');
+        $('[name=image]').css('height', '50px');
+    });
+    new Vue({
+        el: '#tag-form',
+        data: {
+            length: 1
+        },
+        methods: {
+            handleClick: function() {
+                this.length += 1;
+            }
+        }
+    })
+</script>
+
+{% endblock %}

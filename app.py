@@ -23,32 +23,34 @@ class User(db.Model):
             'name': self.name
         }
 
-# ストーリーテーブル
-class Story(db.Model):
-    __tablename__ = 'stories'
+# 思い出テーブル
+class Memory(db.Model):
+    __tablename__ = 'memories'
     id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String())
     user_id = db.Column(db.Integer)
+    ip_addr = db.Column(db.String())
     image = db.Column(db.LargeBinary)
     def to_dict(self):
+        tags = db.session.query(Tag).filter(Tag.memory_id == self.id).all()
+        tags = [tag.name for tag in tags]
         return {
             'id': self.id,
-            'name': self.name,
-            'user_id': self.user_id
+            'user_id': self.user_id,
+            'ip_addr': self.ip_addr,
+            'tags': tags
         }
 
-# シーンテーブル
-class Scene(db.Model):
-    __tablename__ = 'scenes'
+# タグテーブル
+class Tag(db.Model):
+    __tablename__ = 'tags'
     id = db.Column(db.Integer, primary_key = True)
+    memory_id = db.Column(db.Integer)
     name = db.Column(db.String())
-    story_id = db.Column(db.Integer)
-    image = db.Column(db.LargeBinary)
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
-            'story_id': self.story_id
+            'memory_id': self.memory_id,
+            'name': self.name
         }
 
 # マイユーザー取得
@@ -60,14 +62,25 @@ def get_self_user():
 def get_user(username):
     return db.session.query(User).filter(User.name == username).first()
 
-# IDからストーリー取得
-def get_story(story_id):
-    return db.session.query(Story).filter(Story.id == story_id).first()
+# IDから思い出を取得
+def get_memory(memory_id):
+    return db.session.query(Memory).filter(Memory.id == memory_id).first()
 
 # パスワードをハッシュ化して取得
 def get_hash(password):
     text = password.encode('utf-8')
     return hashlib.sha512(text).hexdigest()
+
+# IPアドレス取得
+def get_ip_addr():
+    return request.access_route[0]
+
+# 自身の思い出であるかどうか
+def is_self_memory(user, memory):
+    if user:
+        return memory.user_id == user.id
+    else:
+        return memory.ip_addr == get_ip_addr()
 
 # トップページ
 @app.route('/')
@@ -88,12 +101,13 @@ def signin_page():
 def signin():
     user = get_self_user()
     if user: return redirect(url_for('index'))
-    user = get_user(request.form['username'])
-    if user is None: return render_template('signin.html', error = True)
+    username = request.form['username']
     password = request.form['password']
-    if not password.isalnum(): return render_template('signin.html', error = True)
+    user = get_user(username)
+    if user is None: return render_template('signin.html', error = True, username = username, password = password)
+    if not password.isalnum(): return render_template('signin.html', error = True, username = username, password = password)
     hash = get_hash(password)
-    if hash != user.hash: return render_template('signin.html', error = True)
+    if hash != user.hash: return render_template('signin.html', error = True, username = username, password = password)
     session['user_id'] = user.id
     return redirect(url_for('index'))
 
@@ -110,6 +124,8 @@ def signup():
     user = get_self_user()
     if user: return redirect(url_for('index'))
     username = request.form['username']
+    password = request.form['password']
+    password_confirm = request.form['password_confirm']
     if username == '':
         message = "ユーザー名を入力してください"
         return render_template('signup.html', username_error_message = message)
@@ -117,17 +133,19 @@ def signup():
     if user:
         message = "このユーザー名は既に使用されています"
         return render_template('signup.html', username_error_message = message, username = username)
-    password = request.form['password']
-    if not password.isalnum() or len(password) < 8:
-        message = "パスワードは8文字以上の英数字で設定してください"
+    if not password.isalnum() or len(password) < 6:
+        message = "パスワードは6文字以上の英数字で設定してください"
         return render_template('signup.html', password_error_message = message, username = username)
+    if password != password_confirm:
+        message = "パスワードが一致しません"
+        return render_template('signup.html', password_confirm_error_message = message, username = username, password = password)
     user = User()
     user.name = username
     user.hash = get_hash(password)
     db.session.add(user)
     db.session.commit()
     session['user_id'] = user.id
-    session['message'] = "ようこそ！さっそくストーリーを投稿してみましょう！"
+    session['message'] = "ようこそ！さっそく思い出を投稿してみましょう！"
     return redirect(url_for('index'))
 
 # ログアウト
@@ -136,58 +154,61 @@ def signout():
     session.clear()
     return redirect(url_for('index'))
 
-# ストーリー作成ページ
-@app.route('/story/create')
-def create_story_page():
+# 思い出の作成ページ
+@app.route('/memory/create')
+def create_memory_page():
     user = get_self_user()
-    if user is None: return redirect(url_for('index'))
-    return render_template('create_story.html', user = user)
+    return render_template('create_memory.html', user = user)
 
-# ストーリー作成処理
-@app.route('/story/submit', methods = ['POST'])
-def create_story():
+# 思い出の作成処理
+@app.route('/memory/submit', methods = ['POST'])
+def create_memory():
     user = get_self_user()
-    if user is None: return redirect(url_for('index'))
-    story_name = request.form['story_name']
-    story_image = request.files['story_image']
-    if not (story_name and story_image):
-        return render_template('create_story.html', user = user, error = True)
-    story = Story()
-    story.name = story_name
-    story.user_id = user.id
-    story.image = story_image.read()
-    db.session.add(story)
+    image = request.files['image']
+    tags = request.form.getlist('tags')
+    tags = [tag for tag in tags if tag.strip() != '' and len(tag.strip()) <= 10]
+    if not image: return render_template('create_memory.html', user = user, error = True)
+    memory = Memory()
+    if user: memory.user_id = user.id
+    else: memory.ip_addr = get_ip_addr()
+    memory.image = image.read()
+    db.session.add(memory)
     db.session.commit()
-    session['message'] = "ストーリーを投稿しました！"
+    for tag_name in tags:
+        tag = Tag()
+        tag.memory_id = memory.id
+        tag.name = tag_name
+        db.session.add(tag)
+    db.session.commit()
+    session['message'] = "思い出を投稿しました！"
     return redirect(url_for('index'))
 
-# ストーリー削除処理
-@app.route('/story/<story_id>/delete')
-def delete_story(story_id = None):
+# 思い出の削除処理
+@app.route('/memory/<memory_id>/delete')
+def delete_memory(memory_id = None):
     user = get_self_user()
-    if user is None: return redirect(url_for('index'))
-    story = get_story(story_id)
-    if story is None: return redirect(url_for('index'))
-    if user.id != story.user_id: return redirect(url_for('index'))
-    db.session.delete(story)
+    memory = get_memory(memory_id)
+    if memory is None: return redirect(url_for('index'))
+    if not is_self_memory(user, memory): return redirect(url_for('index'))
+    db.session.delete(memory)
     db.session.commit()
-    session['message'] = "ストーリーを削除しました！"
+    session['message'] = "思い出を削除しました！"
     return redirect(url_for('index'))
 
-# ストーリー取得API
-@app.route('/api/stories')
-def get_stories_api():
-    stories = db.session.query(Story).order_by(Story.id.desc()).limit(100).all()
-    stories = [story.to_dict() for story in stories]
-    return json.dumps(stories)
+# 思い出の取得API
+@app.route('/api/memories')
+def get_memories_api():
+    memories = db.session.query(Memory).order_by(Memory.id.desc()).all()
+    memories = [memory.to_dict() for memory in memories]
+    return json.dumps(memories)
 
-# ストーリー画像取得API
-@app.route('/api/story/<story_id>/image')
-def get_story_image_api(story_id = None):
-    story = get_story(story_id)
+# 思い出の画像取得API
+@app.route('/api/memory/<memory_id>/image')
+def get_memory_image_api(memory_id = None):
+    memory = get_memory(memory_id)
     response = make_response()
-    response.data = story.image
-    response.headers['Content-Disposition'] = f"attachment; filename={story.id}.png"
+    response.data = memory.image
+    response.headers['Content-Disposition'] = f"attachment; filename={memory.id}.png"
     response.mimetype = 'image/*'
     return response
 
@@ -195,7 +216,8 @@ def get_story_image_api(story_id = None):
 @app.route('/api/user')
 def get_self_user_api():
     user = get_self_user()
-    user = user.to_dict() if user else {}
+    if user: user = user.to_dict()
+    else: user = {'ip_addr': get_ip_addr()}
     return json.dumps(user)
 
 if __name__ == "__main__":

@@ -11,23 +11,23 @@
 {% endif %}
 
 <div id="container" class="container">
-    <div class="row justify-content-around mt-5">
+    <div class="row justify-content-around my-5">
 
         <div class="col-5">
             <div class="list-group border rounded" style="height: 500px; overflow-y: scroll;">
-                <button v-for="story in stories" @click="handleClick(story)" v-bind:class="{active: story.id == target.id}" class="list-group-item list-group-item-action">[[ story.name ]]</button>
+                <button v-for="memory in memories" @click="handleClick(memory)" v-bind:class="{active: memory.id == target.id}" class="list-group-item list-group-item-action">[[ memory.tags.join(' | ') ]]</button>
             </div>
-            <a v-if="user.id" class="btn btn-outline-primary w-100 mt-2" href="/story/create">ストーリーを投稿する</a>
+            <a class="btn btn-outline-primary w-100 mt-2" href="/memory/create">思い出を投稿する</a>
         </div>
 
         <div class="col-7 text-center">
-            <a v-if="target.id" v-bind:href="`/story/${target.id}`">
-                <img id="image" class="border rounded mw-100" style="max-height: 400px;">
-            </a>
-            <img v-else class="w-100" src="/static/images/welcome.jpg">
-            <div v-if="user.id && target.user_id == user.id" class="row mt-3 mx-3 justify-content-around">
-                <a class="btn btn-outline-primary col-5" v-bind:href="`/story/${target.id}/edit`">編集</a>
-                <a class="btn btn-outline-danger col-5" v-bind:href="`/story/${target.id}/delete`" onClick="return check()">削除</a>
+            <div class="frame">
+                <img v-if="target.id" id="image" style="max-width: 100%; max-height: 400px;">
+                <img v-else class="w-100" src="/static/images/welcome.jpg">
+            </div>
+            <div v-if="(user.id && target.user_id == user.id) || (user.ip_addr && target.ip_addr == user.ip_addr)" class="row mt-3 mx-3 justify-content-around">
+                <a class="btn btn-outline-primary col-5" v-bind:href="`/memory/${target.id}/edit`">編集</a>
+                <a class="btn btn-outline-danger col-5" v-bind:href="`/memory/${target.id}/delete`" onClick="return check()">削除</a>
             </div>
         </div>
 
@@ -47,13 +47,13 @@
         data: {
             user: {},
             target: {},
-            stories: []
+            memories: []
         },
         methods: {
-            handleClick: function(story) {
-                this.target = story;
+            handleClick: function(memory) {
+                this.target = memory;
                 const xhr = new XMLHttpRequest();
-                xhr.open('GET', `/api/story/${story.id}/image`, true);
+                xhr.open('GET', `/api/memory/${memory.id}/image`, true);
                 xhr.responseType = 'arraybuffer';
                 xhr.onload = function() {
                     const blob = new Blob([this.response], {type: 'image/*'});
@@ -66,11 +66,11 @@
         },
         mounted: function() {
             $.ajax({
-                url: '/api/stories',
+                url: '/api/memories',
                 dataType: 'json'
             })
             .then(
-                stories => this.stories = stories,
+                memories => this.memories = memories,
                 error => console.error(error)
             );
             $.ajax({
