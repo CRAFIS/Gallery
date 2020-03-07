@@ -224,7 +224,7 @@ def get_memory_api():
     updatable = is_own_memory(memory, get_own_user())
     user = get_user_by_id(memory.user_id)
     memory = memory.to_dict()
-    memory['user'] = user.to_dict() if user else {'name': get_ip_addr()}
+    memory['user'] = user.to_dict() if user else {'name': '名無しさん'}
     memory['updatable'] = updatable
     return json.dumps(memory)
 
