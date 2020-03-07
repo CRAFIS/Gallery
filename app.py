@@ -66,6 +66,10 @@ def get_user(username):
 def get_memory(memory_id):
     return db.session.query(Memory).filter(Memory.id == memory_id).first()
 
+# 思い出IDからタグを所得
+def get_tags(memory_id):
+    return db.session.query(Tag).filter(Tag.memory_id == memory_id).all()
+
 # パスワードをハッシュ化して取得
 def get_hash(password):
     text = password.encode('utf-8')
@@ -191,6 +195,9 @@ def delete_memory(memory_id = None):
     memory = get_memory(memory_id)
     if memory is None: return redirect(url_for('index'))
     if not is_self_memory(memory, user): return redirect(url_for('index'))
+    tags = get_tags(memory_id)
+    for tag in tags:
+        db.session.delete(tag)
     db.session.delete(memory)
     db.session.commit()
     session['message'] = "思い出を削除しました！"
