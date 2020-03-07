@@ -76,9 +76,10 @@ def get_ip_addr():
     return request.access_route[0]
 
 # 自身の思い出であるかどうか
-def is_self_memory(user, memory):
-    if user:
-        return memory.user_id == user.id
+def is_self_memory(memory, user):
+    if memory.user_id:
+        if user: return memory.user_id == user.id
+        else: return False
     else:
         return memory.ip_addr == get_ip_addr()
 
@@ -170,7 +171,7 @@ def create_memory():
     if not image: return render_template('create_memory.html', user = user, error = True)
     memory = Memory()
     if user: memory.user_id = user.id
-    else: memory.ip_addr = get_ip_addr()
+    memory.ip_addr = get_ip_addr()
     memory.image = image.read()
     db.session.add(memory)
     db.session.commit()
@@ -189,7 +190,7 @@ def delete_memory(memory_id = None):
     user = get_self_user()
     memory = get_memory(memory_id)
     if memory is None: return redirect(url_for('index'))
-    if not is_self_memory(user, memory): return redirect(url_for('index'))
+    if not is_self_memory(memory, user): return redirect(url_for('index'))
     db.session.delete(memory)
     db.session.commit()
     session['message'] = "思い出を削除しました！"
