@@ -53,13 +53,17 @@ class Tag(db.Model):
             'name': self.name
         }
 
-# マイユーザー取得
-def get_self_user():
+# 自身のユーザー取得
+def get_own_user():
     user_id = session.get('user_id')
     return db.session.query(User).filter(User.id == user_id).first()
 
+# IDからユーザー取得
+def get_user_by_id(user_id):
+    return db.session.query(User).filter(User.id == user_id).first()
+
 # ユーザーネームからユーザー取得
-def get_user(username):
+def get_user_by_name(username):
     return db.session.query(User).filter(User.name == username).first()
 
 # IDから思い出を取得
@@ -80,7 +84,7 @@ def get_ip_addr():
     return request.access_route[0]
 
 # 自身の思い出であるかどうか
-def is_self_memory(memory, user):
+def is_own_memory(memory, user):
     if memory.user_id:
         if user: return memory.user_id == user.id
         else: return False
@@ -90,25 +94,25 @@ def is_self_memory(memory, user):
 # トップページ
 @app.route('/')
 def index():
-    user = get_self_user()
+    user = get_own_user()
     message = session.pop('message', None)
     return render_template('index.html', user = user, message = message)
 
 # ログインページ
 @app.route('/signin')
 def signin_page():
-    user = get_self_user()
+    user = get_own_user()
     if user: return redirect(url_for('index'))
     return render_template('signin.html')
 
 # ログイン処理
 @app.route('/signin/submit', methods = ['POST'])
 def signin():
-    user = get_self_user()
+    user = get_own_user()
     if user: return redirect(url_for('index'))
     username = request.form['username']
     password = request.form['password']
-    user = get_user(username)
+    user = get_user_by_name(username)
     if user is None: return render_template('signin.html', error = True, username = username, password = password)
     if not password.isalnum(): return render_template('signin.html', error = True, username = username, password = password)
     hash = get_hash(password)
@@ -119,14 +123,14 @@ def signin():
 # 新規登録ページ
 @app.route('/signup')
 def signup_page():
-    user = get_self_user()
+    user = get_own_user()
     if user: return redirect(url_for('index'))
     return render_template('signup.html')
 
 # 新規登録処理
 @app.route('/signup/submit', methods = ['POST'])
 def signup():
-    user = get_self_user()
+    user = get_own_user()
     if user: return redirect(url_for('index'))
     username = request.form['username']
     password = request.form['password']
@@ -134,7 +138,7 @@ def signup():
     if username == '':
         message = "ユーザー名を入力してください"
         return render_template('signup.html', username_error_message = message)
-    user = get_user(username)
+    user = get_user_by_name(username)
     if user:
         message = "このユーザー名は既に使用されています"
         return render_template('signup.html', username_error_message = message, username = username)
@@ -162,13 +166,13 @@ def signout():
 # 思い出の作成ページ
 @app.route('/memory/create')
 def create_memory_page():
-    user = get_self_user()
+    user = get_own_user()
     return render_template('create_memory.html', user = user)
 
 # 思い出の作成処理
 @app.route('/memory/submit', methods = ['POST'])
 def create_memory():
-    user = get_self_user()
+    user = get_own_user()
     image = request.files['image']
     tags = request.form.getlist('tags')
     tags = [tag for tag in tags if tag.strip() != '' and len(tag.strip()) <= 10]
@@ -188,29 +192,43 @@ def create_memory():
     session['message'] = "思い出を投稿しました！"
     return redirect(url_for('index'))
 
-# 思い出の削除処理
-@app.route('/memory/<memory_id>/delete')
-def delete_memory(memory_id = None):
-    user = get_self_user()
+# 思い出を削除するAPI
+@app.route('/api/memory/delete', methods = ['POST'])
+def delete_memory_api():
+    memory_id = request.form['id']
+    user = get_own_user()
     memory = get_memory(memory_id)
-    if memory is None: return redirect(url_for('index'))
-    if not is_self_memory(memory, user): return redirect(url_for('index'))
+    if memory is None: return {'status': 'MEMORY_NOT_FOUND_ERROR'}
+    if not is_own_memory(memory, user): return {'status': 'NOT_OWN_MEMORY_ERROR'}
     tags = get_tags(memory_id)
     for tag in tags:
         db.session.delete(tag)
     db.session.delete(memory)
     db.session.commit()
     session['message'] = "思い出を削除しました！"
-    return redirect(url_for('index'))
+    return {'status': 'SUCCESS'}
 
-# 思い出の取得API
+# 思い出を全て取得するAPI
 @app.route('/api/memories')
 def get_memories_api():
     memories = db.session.query(Memory).order_by(Memory.id.desc()).all()
     memories = [memory.to_dict() for memory in memories]
     return json.dumps(memories)
 
-# 思い出の画像取得API
+# IDから思い出を取得するAPI
+@app.route('/api/memory')
+def get_memory_api():
+    memory_id = request.args.get('id')
+    memory = get_memory(memory_id)
+    if memory is None: return {}
+    updatable = is_own_memory(memory, get_own_user())
+    user = get_user_by_id(memory.user_id)
+    memory = memory.to_dict()
+    memory['user'] = user.to_dict() if user else {'name': get_ip_addr()}
+    memory['updatable'] = updatable
+    return json.dumps(memory)
+
+# 思い出の画像を取得するAPI
 @app.route('/api/memory/<memory_id>/image')
 def get_memory_image_api(memory_id = None):
     memory = get_memory(memory_id)
@@ -220,12 +238,11 @@ def get_memory_image_api(memory_id = None):
     response.mimetype = 'image/*'
     return response
 
-# マイユーザー取得API
+# マイユーザーを取得するAPI
 @app.route('/api/user')
-def get_self_user_api():
-    user = get_self_user()
-    if user: user = user.to_dict()
-    else: user = {'ip_addr': get_ip_addr()}
+def get_own_user_api():
+    user = get_own_user()
+    user = user.to_dict() if user else {'ip_addr': get_ip_addr()}
     return json.dumps(user)
 
 if __name__ == "__main__":

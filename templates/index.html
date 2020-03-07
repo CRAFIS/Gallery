@@ -11,34 +11,68 @@
 {% endif %}
 
 <div id="container" class="container">
+
     <div class="row justify-content-around fixed-top py-4" style="margin-top: 60px; background-color: rgba(255, 255, 255, 0.8);">
         <div class="col-5 align-self-center">
             <a class="btn btn-outline-primary w-100" href="/memory/create">思い出を投稿する</a>
         </div>
     </div>
+
     <div class="row justify-content-around" style="margin-top: 86px;">
-        <div v-for="memory in memories" class="frame mb-4" style="width: 250px;">
-                <img :id="memory.id" style="width: 100%; height: 250px; object-fit: cover;">
+        <div v-for="memory in memories" type="button" class="frame mb-4" @click="openModal(memory.id)" data-toggle="modal" data-target="#modal" style="width: 250px;">
+            <img :id="memory.id" style="width: 100%; height: 250px; object-fit: cover;">
         </div>
     </div>
+
+    <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 v-if="target" class="modal-title">[[ target.user.name ]]</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="frame">
+                                <img id="modal-image" class="w-100">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div>
+                                <label>タグ</label>
+                                <ul v-if="target" class="list-group">
+                                    <li v-for="tag in target.tags" class="list-group-item">[[ tag ]]</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="target" class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">閉じる</button>
+                    <button type="button" class="btn btn-danger" v-if="target.updatable" @click="deleteMemory">削除</button>
+                    <button type="button" class="btn btn-primary" v-if="target.updatable" @click="saveMemory">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
     function closeMessage() {
         $('#message').fadeOut('fast', () => $(this).remove());
     }
-    function checkDelete() {
-        if (window.confirm("本当に削除してもよろしいですか？")) return true;
-        else return false;
-    }
-    function showImage(id) {
+    function showImage(memoryId, elementId) {
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', `/api/memory/${id}/image`, true);
+        xhr.open('GET', `/api/memory/${memoryId}/image`, true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
             const blob = new Blob([this.response], {type: 'image/*'});
             const url = window.URL || window.webkitURL;
-            const img = document.getElementById(id);
+            const img = document.getElementById(elementId);
             img.src = url.createObjectURL(blob);
         }
         xhr.send();
@@ -46,11 +80,38 @@
     new Vue({
         el: '#container',
         data: {
-            user: {},
-            target: {},
-            memories: []
+            memories: [],
+            target: null
         },
         methods: {
+            openModal: function(memoryId) {
+                $.ajax({
+                    url: '/api/memory',
+                    dataType: 'json',
+                    data: {id: memoryId}
+                })
+                .then(
+                    memory => this.target = memory,
+                    error => console.error(error)
+                );
+                const src = $(`#${memoryId}`).attr('src');
+                $('#modal-image').attr('src', src);
+            },
+            deleteMemory: function() {
+                if (!window.confirm("本当に削除してもよろしいですか？")) return;
+                $.ajax({
+                    url: '/api/memory/delete',
+                    dataType: 'json',
+                    type: 'POST',
+                    data: {id: this.target.id}
+                })
+                .then(
+                    response => location.reload(),
+                    error => console.error(error)
+                );
+            },
+            saveMemory: function() {
+            }
         },
         mounted: function() {
             $.ajax({
@@ -60,16 +121,8 @@
             .then(
                 memories => {
                     this.memories = memories;
-                    memories.forEach((memory) => showImage(memory.id));
+                    memories.forEach((memory) => showImage(memory.id, memory.id));
                 },
-                error => console.error(error)
-            );
-            $.ajax({
-                url: '/api/user',
-                dataType: 'json'
-            })
-            .then(
-                user => this.user = user,
                 error => console.error(error)
             );
         },

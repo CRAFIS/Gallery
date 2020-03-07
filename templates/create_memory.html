@@ -56,6 +56,7 @@
         methods: {
             handleClick: function() {
                 this.length += 1;
+                setTimeout(() => $('[name=tags]').last().focus(), 10);
             }
         }
     })
