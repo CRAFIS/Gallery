@@ -31,11 +31,9 @@ $ dropdb gallery
 ## Deployment
 
 ```
-$ heroku create <YOUR APP>
+$ heroku create
+$ heroku addons:create heroku-postgresql:hobby-dev
 $ git push heroku master
-
-// Heroku Dashboard -> Resources -> Add-ons -> Heroku Postgres
-
 $ heroku run python
 
 >>> from app import db
