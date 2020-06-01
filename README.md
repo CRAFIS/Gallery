@@ -1,7 +1,5 @@
 # 思い出ギャラリー
 
-https://memories-gallery.herokuapp.com
-
 ## Development
 
 ### Server 1
